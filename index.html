@@ -21,32 +21,39 @@
         #resetButton:hover { color: #c92a2a; }
         .profiles-container { border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; background-color: #ffffff; overflow-x: auto; /* 가로 스크롤 허용 */ }
         .profiles-container h2 { margin-top: 0; margin-bottom: 20px; font-size: 18px; font-weight: 600; color: #495057; }
-        .profile-row { margin-bottom: 25px; min-width: 700px; /* 최소 너비 설정 */ position: relative; /* 외부 라벨 기준점 */ }
+        .profile-row { margin-bottom: 25px; min-width: 700px; /* 최소 너비 설정 */ position: relative; }
         .timeline-bar-container { position: relative; height: 28px; background-color: #f1f3f5; border-radius: 3px; margin-bottom: 5px; }
-        .phase-bar { position: absolute; top: 0; height: 100%; display: flex; align-items: center; justify-content: flex-start; padding-left: 8px; box-sizing: border-box; overflow: hidden; /* 막대 안에서 텍스트 잘림 */ border-right: 1px solid rgba(255, 255, 255, 0.5); }
+
+        /* --- phase-bar 스타일 수정: overflow: visible --- */
+        .phase-bar {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 8px;
+            box-sizing: border-box;
+            overflow: visible; /* 텍스트 오버플로우 허용 */
+            border-right: 1px solid rgba(255, 255, 255, 0.5);
+        }
         .phase-bar:last-child { border-right: none; }
         .phase-0 { background-color: rgb(121, 209, 84); } /* Drying */
         .phase-1 { background-color: rgb(255, 230, 140); } /* Maillard */
         .phase-2 { background-color: rgb(184, 152, 73); } /* Development */
-        .phase-label { font-size: 12px; color: #212529; font-weight: 600; white-space: nowrap; /* 텍스트 줄바꿈 방지 */ }
 
-        /* --- 짧은 막대 외부 표시용 스타일 --- */
-        .phase-label-outside {
-            position: absolute;
-            top: 50%; /* 막대 중앙에 수직 정렬 */
-            /* left와 transform 속성은 JS에서 동적으로 설정 */
-            transform: translateY(-50%) translateX(5px); /* 요소 자체 높이의 절반만큼 위로 올리고, 막대 끝에서 5px 오른쪽으로 이동 */
-            font-size: 11px; /* 막대 내부보다 약간 작게 또는 동일하게 */
-            color: #495057; /* 파일명 등과 동일한 색상 */
-            background-color: rgba(255, 255, 255, 0.9); /* 약간의 배경색으로 가독성 향상 */
-            padding: 1px 4px;
-            border-radius: 3px;
+        /* --- phase-label 스타일: overflow 시에도 기본 스타일 유지 --- */
+        .phase-label {
+            font-size: 12px;
+            color: #212529;
+            font-weight: 600;
             white-space: nowrap; /* 텍스트 줄바꿈 방지 */
-            z-index: 5; /* 다른 요소 위에 표시 */
-            border: 1px solid #adb5bd; /* 외곽선 추가 */
-            /* pointer-events: none; /* 텍스트가 마우스 이벤트를 가로막지 않도록 함 - 필요시 주석 해제 */
+            /* 필요에 따라 그림자나 윤곽선 추가 가능 */
+            /* text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5); */
         }
 
+        /* --- 외부 라벨 관련 스타일 제거 (사용하지 않음) --- */
+        /* .phase-label-outside { ... } */
 
         .time-marker { position: absolute; bottom: -18px; transform: translateX(-50%); font-size: 11px; color: #495057; }
         .time-marker.end-marker { font-weight: bold; color: #c92a2a; }
@@ -266,6 +273,11 @@
         endPoint = validData[validData.length - 1];
 
         // 만약 160도나 1차 크랙에 도달하지 않았다면, 해당 지점은 종료 지점으로 설정
+        // 단, validData가 비어있지 않아야 endPoint에 접근 가능
+        if (!validData || validData.length === 0) {
+             console.warn(`No valid data points found for calculating endpoints in ${fileName}`);
+             return null;
+        }
         if (!temp160Point) temp160Point = endPoint;
         if (!firstCrackPoint) firstCrackPoint = endPoint;
 
@@ -275,50 +287,65 @@
         const phase1EndSec = temp160Point.timeSeconds;
         const phase2EndSec = firstCrackPoint.timeSeconds;
 
-        const phase1DurSec = phase1EndSec; // Drying: 시작(0초) ~ 160도 도달
-        const phase2DurSec = Math.max(0, phase2EndSec - phase1EndSec); // Maillard: 160도 도달 ~ 1차 크랙
-        const phase3DurSec = Math.max(0, totalSeconds - phase2EndSec); // Development: 1차 크랙 ~ 종료
+        // 단계 시작 시간 및 길이 계산
+        const phase1StartSec = 0;
+        const phase1DurSec = phase1EndSec - phase1StartSec; // Drying: 시작(0초) ~ 160도 도달 (음수 방지)
 
-        // 각 단계의 RoR 계산 (단계 시작 지점부터 끝 지점까지의 평균 RoR)
-        // RoR 계산을 위한 데이터 인덱스 찾기
-        const temp160IdxInData = validData.findIndex(p => p.timeSeconds === temp160Point.timeSeconds);
-        const firstCrackIdxInData = validData.findIndex(p => p.timeSeconds === firstCrackPoint.timeSeconds);
-        const endIdxInData = validData.length - 1; // 마지막 데이터 포인트 인덱스
+        const phase2StartSec = phase1EndSec;
+        const phase2DurSec = Math.max(0, phase2EndSec - phase2StartSec); // Maillard: 160도 도달 ~ 1차 크랙 (음수 방지)
 
-        // 평균 RoR 계산 함수: startIndex와 endIndex (inclusive) 사이 데이터로 계산
-        const calculateAvgRoR = (startIndex, endIndex) => {
-             // 인덱스 유효성 및 순서 확인
-             if (startIndex < 0 || endIndex >= validData.length || startIndex >= endIndex) {
-                //console.warn(`Invalid indices for RoR calculation: ${startIndex} to ${endIndex} in ${fileName}`);
-                 return 0; // 유효하지 않으면 RoR은 0
-             }
+        const phase3StartSec = phase2EndSec;
+        const phase3DurSec = Math.max(0, totalSeconds - phase3StartSec); // Development: 1차 크랙 ~ 종료 (음수 방지)
 
-             let totalRoR = 0;
-             let count = 0;
+         // 각 단계의 RoR 계산 (단계 시작 지점부터 끝 지점까지의 평균 RoR)
+         // RoR 계산을 위한 데이터 인덱스 찾기
+         // findIndex는 첫 번째 일치하는 인덱스를 반환. 여러 데이터가 동일 시간에 있을 수 있으므로,
+         // 정확히 해당 시간의 마지막 데이터 포인트를 찾아야 할 수도 있으나, 여기서는 단순화하여 처리.
+         // 더 정확한 RoR 계산을 위해서는 시점(point) 객체 자체를 넘겨서 validData 내에서 인덱스를 찾는 것보다,
+         // 해당 시점의 timeSeconds 값과 같거나 큰 첫 번째 인덱스를 찾고, 다음 단계 시작 지점보다 작은 인덱스까지 포함하는 방식으로
+         // 범위를 지정하는 것이 더 안전할 수 있습니다. 현재 코드는 timeSeconds가 정확히 일치하는 지점을 찾습니다.
+         const temp160IdxInData = validData.findIndex(p => p.timeSeconds >= temp160Point.timeSeconds); // 160도 이상 되는 첫 지점
+         const firstCrackIdxInData = validData.findIndex(p => p.timeSeconds >= firstCrackPoint.timeSeconds); // 204도 이상 되는 첫 지점
+         const endIdxInData = validData.length - 1; // 마지막 데이터 포인트 인덱스
 
-             // 시작 지점 다음 데이터부터 끝 지점까지 순회하며 RoR 계산
-             for (let i = startIndex + 1; i <= endIndex; i++) {
-                 const prev = validData[i-1];
-                 const curr = validData[i];
-                 const timeDiff = curr.timeSeconds - prev.timeSeconds;
+         // 평균 RoR 계산 함수: startIndex (inclusive)부터 endIndex (inclusive) 사이 데이터로 계산
+         const calculateAvgRoR = (startIndex, endIndex) => {
+              // 유효한 데이터 범위 확인 (최소 2개 지점 필요)
+              if (startIndex < 0 || endIndex >= validData.length || startIndex >= endIndex) {
+                  //console.warn(`Invalid indices for RoR calculation: ${startIndex} to ${endIndex} in ${fileName}`);
+                  return 0; // 유효하지 않으면 RoR은 0
+              }
 
-                 // 시간 간격이 0 이하이면 (동일 시간) 계산에서 제외
-                 if (timeDiff <= 0) continue;
+              let totalRoR = 0;
+              let count = 0;
 
-                 const tempDiff = curr.beanTemp - prev.beanTemp;
-                 const currentRoR = (tempDiff / timeDiff) * 60; // °C/초를 °C/분으로 변환
-                 totalRoR += currentRoR;
-                 count++;
-             }
+              // 시작 지점 다음 데이터부터 끝 지점까지 순회하며 RoR 계산
+              for (let i = startIndex + 1; i <= endIndex; i++) {
+                  const prev = validData[i-1];
+                  const curr = validData[i];
+                  const timeDiff = curr.timeSeconds - prev.timeSeconds;
 
-             // 평균 계산 후 반올림
-             return count > 0 ? Math.round(totalRoR / count) : 0;
-        };
+                  // 시간 간격이 0 이하이면 (동일 시간) 계산에서 제외
+                  if (timeDiff <= 0) continue;
 
-        const phase1RoR = calculateAvgRoR(0, temp160IdxInData);
-        const phase2RoR = calculateAvgRoR(temp160IdxInData, firstCrackIdxInData);
-        // Development 단계는 1차 크랙 지점부터 마지막 데이터까지
-        const phase3RoR = calculateAvgRoR(firstCrackIdxInData, endIdxInData);
+                  const tempDiff = curr.beanTemp - prev.beanTemp;
+                  const currentRoR = (tempDiff / timeDiff) * 60; // °C/초를 °C/분으로 변환
+                  totalRoR += currentRoR;
+                  count++;
+              }
+
+              // 평균 계산 후 반올림 (소수점 첫째 자리까지 표시)
+              // ROR이 항상 정수일 것이라는 보장은 없으므로, 반올림하여 소수점 첫째 자리까지 표시하도록 변경
+              return count > 0 ? (totalRoR / count).toFixed(1) : '0.0';
+         };
+
+         // calculateAvgRoR 함수에 전달하는 인덱스 범위 조정
+         // Drying (0초~160도): validData[0]부터 160도 도달 지점까지
+         const phase1RoR = calculateAvgRoR(0, temp160IdxInData > 0 ? temp160IdxInData : 0); // 160도 도달 못하면 시작점만 포함 (RoR 0)
+         // Maillard (160도~204도): 160도 도달 지점부터 204도 도달 지점까지
+         const phase2RoR = calculateAvgRoR(temp160IdxInData, firstCrackIdxInData > temp160IdxInData ? firstCrackIdxInData : temp160IdxInData); // 204도 도달 못하면 160도 지점만 포함
+         // Development (204도~종료): 204도 도달 지점부터 마지막 지점까지
+         const phase3RoR = calculateAvgRoR(firstCrackIdxInData, endIdxInData > firstCrackIdxInData ? endIdxInData : firstCrackIdxInData); // 종료점까지 도달 못하면 204도 지점만 포함
 
 
         // 각 단계 시간의 총 시간 대비 백분율 계산
@@ -326,15 +353,17 @@
             return totalSeconds > 0 ? (duration / totalSeconds * 100).toFixed(1) : '0.0';
         };
 
+        // 단계 정보 객체 생성
+        const phases = [
+             { name: 'Drying', durationSeconds: phase1DurSec, startSeconds: phase1StartSec, percentage: calculatePercentage(phase1DurSec), avgRoR: phase1RoR },
+             { name: 'Maillard', durationSeconds: phase2DurSec, startSeconds: phase2StartSec, percentage: calculatePercentage(phase2DurSec), avgRoR: phase2RoR },
+             { name: 'Development', durationSeconds: phase3DurSec, startSeconds: phase3StartSec, percentage: calculatePercentage(phase3DurSec), avgRoR: phase3RoR }
+        ];
 
         // 분석 결과 객체 반환
         return {
             fileName,
-            phases: [
-                { name: 'Drying', durationSeconds: phase1DurSec, startSeconds: 0, percentage: calculatePercentage(phase1DurSec), avgRoR: phase1RoR },
-                { name: 'Maillard', durationSeconds: phase2DurSec, startSeconds: phase1DurSec, percentage: calculatePercentage(phase2DurSec), avgRoR: phase2RoR },
-                { name: 'Development', durationSeconds: phase3DurSec, startSeconds: phase1DurSec + phase2DurSec, percentage: calculatePercentage(phase3DurSec), avgRoR: phase3RoR }
-            ],
+            phases: phases.filter(phase => phase.durationSeconds > 0), // 길이가 0인 단계는 제외하고 표시 (선택 사항)
             totalSeconds // 전체 로스팅 시간
         };
     }
@@ -358,11 +387,6 @@
         const axisPaddingSeconds = 60; // 축 끝에 추가할 여유 시간
         const axisDurationSeconds = Math.max(300, maxOverallTime + axisPaddingSeconds); // 시간 축 총 길이 (초)
 
-        // --- 막대 길이에 따른 정보 표시 기준 (퍼센트) ---
-        // 이 값보다 작으면 막대 밖에 정보를 표시합니다.
-        // 실제 테스트를 통해 적절한 값으로 조정하세요.
-        const labelInsideThresholdPercent = 5; // 예시 값: 막대 너비가 5% 미만이면 외부에 표시
-
         // 정렬된 profilesData 배열을 순회하며 각 프로파일 렌더링
         profilesData.forEach(profile => {
             const profileRow = document.createElement('div');
@@ -382,36 +406,24 @@
                 phaseBar.style.left = `${startPercent}%`;
                 phaseBar.style.width = `${widthPercent}%`;
 
-                // 막대에 마우스 올렸을 때 나오는 정보 (툴팁은 아니지만 HTML title 속성)
-                // 사용자 요구사항에 따라 ROR 포함 가능
+                // HTML title 속성은 그대로 두어 마우스 오버 시 추가 정보 제공 (툴팁 아님)
                 phaseBar.title = `${phase.name}: ${phase.percentage}% (${formatTime(phase.durationSeconds)}) RoR:${phase.avgRoR}`;
 
-                // --- **** 조건부 라벨 표시 로직 **** ---
-                const labelText = `${phase.percentage}% (${formatTime(phase.durationSeconds)})`;
+                // --- **** 라벨 표시 로직 수정: ROR 포함 및 오버플로우 허용 **** ---
+                const phaseLabel = document.createElement('span');
+                phaseLabel.className = 'phase-label';
 
-                if (widthPercent >= labelInsideThresholdPercent) {
-                    // 막대 안에 정보를 표시할 공간이 충분한 경우
-                    const phaseLabel = document.createElement('span');
-                    phaseLabel.className = 'phase-label';
-                    phaseLabel.textContent = labelText;
-                    phaseBar.appendChild(phaseLabel);
-                } else {
-                    // 막대가 짧아 정보를 막대 바깥에 표시해야 하는 경우
-                    const outsideLabelDiv = document.createElement('div');
-                    outsideLabelDiv.className = 'phase-label-outside';
-                    outsideLabelDiv.textContent = labelText;
+                // 표시할 텍스트: 백분율 (시간) RoR:값
+                phaseLabel.textContent = `${phase.percentage}% (${formatTime(phase.durationSeconds)}) RoR:${phase.avgRoR}`;
 
-                    // 막대 끝 위치 계산 (퍼센트)
-                    const endPercent = (endSeconds / axisDurationSeconds) * 100;
-                    outsideLabelDiv.style.left = `${endPercent}%`;
+                 // 막대 안에 라벨 추가
+                 phaseBar.appendChild(phaseLabel);
 
-                    // profileRow에 외부 라벨 추가 (position: absolute 기준으로 profileRow 사용)
-                    profileRow.appendChild(outsideLabelDiv);
-                }
 
                 barContainer.appendChild(phaseBar);
 
                 // 단계 종료 시간 마커 표시 (마지막 단계 제외)
+                // 마지막 단계는 총 로스팅 시간 마커로 대체
                 if (index < profile.phases.length - 1) {
                     const midMarker = document.createElement('div');
                     midMarker.className = 'time-marker';

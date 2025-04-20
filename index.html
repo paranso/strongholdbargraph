@@ -7,7 +7,7 @@
     <!-- SheetJS 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        /* --- CSS 스타일 (이전과 동일) --- */
+        /* --- CSS 스타일 (글자 크기 약간 축소) --- */
         body { font-family: sans-serif; background-color: #f8f9fa; padding: 20px; color: #333; }
         .container { max-width: 900px; margin: 0 auto; background-color: #fff; padding: 20px 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
         h1 { text-align: center; margin-bottom: 30px; color: #343a40; font-size: 24px; font-weight: 600; }
@@ -28,7 +28,7 @@
         .phase-0 { background-color: rgb(121, 209, 84); }
         .phase-1 { background-color: rgb(255, 230, 140); }
         .phase-2 { background-color: rgb(184, 152, 73); }
-        .phase-label { font-size: 12px; color: #212529; font-weight: 600; white-space: nowrap; }
+        .phase-label { font-size: 11px; color: #212529; font-weight: 600; white-space: nowrap; }
         .time-marker { position: absolute; bottom: -18px; transform: translateX(-50%); font-size: 11px; color: #495057; }
         .time-marker.end-marker { font-weight: bold; color: #c92a2a; }
         .profile-filename { font-size: 11px; color: #495057; margin-left: 8px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -69,44 +69,29 @@
     const timeAxisContainerDiv = document.getElementById('timeAxisContainer');
 
     // --- 도우미 함수 ---
-    const timeToSeconds = (timeStr) => { /* (이전과 동일) */ if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return 0; const parts = timeStr.split(':'); if (parts.length !== 2) return 0; const [minutes, seconds] = parts.map(Number); if (isNaN(minutes) || isNaN(seconds)) return 0; return minutes * 60 + seconds; };
-    const formatTime = (seconds) => { /* (이전과 동일) */ const totalSeconds = Math.max(0, Math.floor(seconds)); const mins = Math.floor(totalSeconds / 60); const secs = totalSeconds % 60; return `${mins}:${secs.toString().padStart(2, '0')}`; };
+    const timeToSeconds = (timeStr) => { if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return 0; const parts = timeStr.split(':'); if (parts.length !== 2) return 0; const [minutes, seconds] = parts.map(Number); if (isNaN(minutes) || isNaN(seconds)) return 0; return minutes * 60 + seconds; };
+    const formatTime = (seconds) => { const totalSeconds = Math.max(0, Math.floor(seconds)); const mins = Math.floor(totalSeconds / 60); const secs = totalSeconds % 60; return `${mins}:${secs.toString().padStart(2, '0')}`; };
 
-    // --- **** 프로파일 정렬 함수 추가 **** ---
+    // --- 프로파일 정렬 함수 ---
     const compareProfiles = (profileA, profileB) => {
-        // 파일 이름에서 첫 번째 숫자 그룹 추출 (없으면 null)
         const numMatchA = profileA.fileName.match(/\d+/);
         const numMatchB = profileB.fileName.match(/\d+/);
-
         const numA = numMatchA ? parseInt(numMatchA[0], 10) : null;
         const numB = numMatchB ? parseInt(numMatchB[0], 10) : null;
-
-        // 1. 둘 다 숫자가 있는 경우: 숫자 오름차순 정렬
-        if (numA !== null && numB !== null) {
-            return numA - numB;
-        }
-        // 2. A만 숫자가 있는 경우: A가 먼저 오도록 (-1)
-        else if (numA !== null && numB === null) {
-            return -1;
-        }
-        // 3. B만 숫자가 있는 경우: B가 먼저 오도록 (1)
-        else if (numA === null && numB !== null) {
-            return 1;
-        }
-        // 4. 둘 다 숫자가 없는 경우: 파일 이름 알파벳 오름차순 정렬
-        else {
-            return profileA.fileName.localeCompare(profileB.fileName);
-        }
+        if (numA !== null && numB !== null) return numA - numB;
+        else if (numA !== null) return -1;
+        else if (numB !== null) return 1;
+        else return profileA.fileName.localeCompare(profileB.fileName);
     };
 
-
-    // --- 이벤트 리스너 ---
+    // 이벤트 리스너
     fileInput.addEventListener('change', handleFileUpload);
     resetButton.addEventListener('click', resetAnalysis);
 
-    // --- 파일 업로드 처리 ---
+    // 파일 업로드 처리
     async function handleFileUpload(event) {
-        const files = Array.from(event.target.files); if (files.length === 0) return;
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
         const newFiles = files.filter(file => !profilesData.some(p => p.fileName === file.name));
         if (newFiles.length === 0 && files.length > 0) { alert("선택한 파일이 이미 로드되었습니다."); fileInput.value = ''; return; }
         if (newFiles.length === 0) return;
@@ -115,9 +100,8 @@
         const validNewProfiles = newProcessedProfiles.filter(p => p !== null);
         if (validNewProfiles.length > 0) {
             profilesData = [...profilesData, ...validNewProfiles];
-            // --- **** 렌더링 전에 정렬 **** ---
             profilesData.sort(compareProfiles);
-            renderProfiles(); // 정렬된 데이터로 렌더링
+            renderProfiles();
             fileCountSpan.textContent = `파일 ${profilesData.length}개`;
             resetButton.style.display = 'inline-block';
             profilesChartContainer.style.display = 'block';
@@ -125,54 +109,68 @@
         fileInput.value = '';
     }
 
-    // --- 단일 파일 처리 ---
-    async function processSingleFile(file) { /* (이전과 동일) */ try { const buffer = await file.arrayBuffer(); const workbook = XLSX.read(buffer, { type: 'array' }); const firstSheetName = workbook.SheetNames[0]; const worksheet = workbook.Sheets[firstSheetName]; const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }); return analyzeProfile(jsonData, file.name); } catch (error) { console.error(`Error processing file ${file.name}:`, error); alert(`파일 처리 오류 (${file.name}): ${error.message}`); return null; } }
+    // 단일 파일 처리
+    async function processSingleFile(file) { /* ... */ }
 
-    // --- 프로파일 데이터 분석 ---
-    function analyzeProfile(jsonData, fileName) { /* (이전과 동일) */ if (!Array.isArray(jsonData) || jsonData.length < 2) return null; let timeColIdx = -1, tempColIdx = -1; const headerRow = jsonData[0]; if (headerRow && Array.isArray(headerRow)) { timeColIdx = headerRow.findIndex(h => typeof h === 'string' && (h.includes('시간') || h.toLowerCase().includes('time'))); tempColIdx = headerRow.findIndex(h => typeof h === 'string' && (h.includes('원두') || h.toLowerCase().includes('bean'))); } if (timeColIdx === -1 || tempColIdx === -1) { console.error(`Required columns not found in ${fileName}`); return null; } const validData = []; let temp160Point = null, firstCrackPoint = null, endPoint = null; for (let i = 1; i < jsonData.length; i++) { const row = jsonData[i]; const timeStr = row[timeColIdx]; const beanTemp = Number(row[tempColIdx]); if (timeStr && typeof timeStr === 'string' && timeStr.includes(':') && !isNaN(beanTemp)) { const timeSeconds = timeToSeconds(timeStr); const point = { timeStr, timeSeconds, beanTemp, rowIndex: i }; validData.push(point); if (!temp160Point && beanTemp >= 160) temp160Point = point; if (!firstCrackPoint && beanTemp >= 204) firstCrackPoint = point; } } if (validData.length < 2) return null; endPoint = validData[validData.length - 1]; if (!temp160Point) temp160Point = endPoint; if (!firstCrackPoint) firstCrackPoint = endPoint; const calculateAvgRoR = (startIndex, endIndex) => { if (startIndex >= endIndex || startIndex < 0 || endIndex >= validData.length) return 0; let totalRoR = 0, count = 0; for (let i = startIndex + 1; i <= endIndex; i++) { const prev = validData[i-1], curr = validData[i]; const timeDiff = curr.timeSeconds - prev.timeSeconds; if (timeDiff <= 0) continue; const tempDiff = curr.beanTemp - prev.beanTemp; totalRoR += (tempDiff / timeDiff) * 60; count++; } return count > 0 ? Math.round(totalRoR / count) : 0; }; const totalSeconds = endPoint.timeSeconds; const phase1EndSec = temp160Point.timeSeconds; const phase2EndSec = firstCrackPoint.timeSeconds; const phase1DurSec = phase1EndSec; const phase2DurSec = Math.max(0, phase2EndSec - phase1EndSec); const phase3DurSec = Math.max(0, totalSeconds - phase2EndSec); const temp160IdxInData = validData.findIndex(p => p.timeSeconds === temp160Point.timeSeconds); const firstCrackIdxInData = validData.findIndex(p => p.timeSeconds === firstCrackPoint.timeSeconds); const endIdxInData = validData.length - 1; const phase1RoR = calculateAvgRoR(0, temp160IdxInData); const phase2RoR = calculateAvgRoR(temp160IdxInData, firstCrackIdxInData); const phase3RoR = calculateAvgRoR(firstCrackIdxInData, endIdxInData); const calculatePercentage = (duration) => totalSeconds > 0 ? (duration / totalSeconds * 100).toFixed(1) : '0.0'; return { fileName, phases: [ { name: 'Drying', durationSeconds: phase1DurSec, startSeconds: 0, percentage: calculatePercentage(phase1DurSec), avgRoR: phase1RoR }, { name: 'Maillard', durationSeconds: phase2DurSec, startSeconds: phase1DurSec, percentage: calculatePercentage(phase2DurSec), avgRoR: phase2RoR }, { name: 'Development', durationSeconds: phase3DurSec, startSeconds: phase1DurSec + phase2DurSec, percentage: calculatePercentage(phase3DurSec), avgRoR: phase3RoR } ], totalSeconds }; }
+    // 프로파일 데이터 분석
+    function analyzeProfile(jsonData, fileName) { /* ... */ }
 
-    // --- 프로파일 및 시간 축 렌더링 ---
+    // 프로파일 및 시간 축 렌더링
     function renderProfiles() {
-        profilesListDiv.innerHTML = ''; timeAxisContainerDiv.innerHTML = '';
+        profilesListDiv.innerHTML = '';
+        timeAxisContainerDiv.innerHTML = '';
         if (profilesData.length === 0) return;
 
-        // --- **** 여기서 정렬된 데이터 사용 **** ---
-        // profilesData 배열은 handleFileUpload에서 이미 정렬됨
+        let maxOverallTime = 0;
+        profilesData.forEach(p => { if (p.totalSeconds > maxOverallTime) maxOverallTime = p.totalSeconds; });
+        const axisPaddingSeconds = 60;
+        const axisDurationSeconds = Math.max(300, maxOverallTime + axisPaddingSeconds);
 
-        let maxOverallTime = 0; profilesData.forEach(p => { if (p.totalSeconds > maxOverallTime) maxOverallTime = p.totalSeconds; });
-        const axisPaddingSeconds = 60; const axisDurationSeconds = Math.max(300, maxOverallTime + axisPaddingSeconds);
-
-        // --- **** 정렬된 순서대로 렌더링 **** ---
         profilesData.forEach(profile => {
             const profileRow = document.createElement('div'); profileRow.className = 'profile-row';
             const barContainer = document.createElement('div'); barContainer.className = 'timeline-bar-container';
             profile.phases.forEach((phase, index) => {
-                const startPercent = (phase.startSeconds / axisDurationSeconds) * 100; const widthPercent = (phase.durationSeconds / axisDurationSeconds) * 100; const endSeconds = phase.startSeconds + phase.durationSeconds;
-                const phaseBar = document.createElement('div'); phaseBar.className = `phase-bar phase-${index}`; phaseBar.style.left = `${startPercent}%`; phaseBar.style.width = `${widthPercent}%`; phaseBar.title = `${phase.name}: ${phase.percentage}% (${formatTime(phase.durationSeconds)}) RoR:${phase.avgRoR}`;
-                const phaseLabel = document.createElement('span'); phaseLabel.className = 'phase-label'; if (widthPercent >= 4) { phaseLabel.textContent = `${phase.percentage}% (${formatTime(phase.durationSeconds)}) (${phase.avgRoR})`; } phaseBar.appendChild(phaseLabel); barContainer.appendChild(phaseBar);
-                if (index < profile.phases.length - 1) { const midMarker = document.createElement('div'); midMarker.className = 'time-marker'; midMarker.style.left = `${(endSeconds / axisDurationSeconds) * 100}%`; midMarker.textContent = formatTime(endSeconds); barContainer.appendChild(midMarker); }
+                const startPercent = (phase.startSeconds / axisDurationSeconds) * 100;
+                const widthPercent = (phase.durationSeconds / axisDurationSeconds) * 100;
+                const endSeconds = phase.startSeconds + phase.durationSeconds;
+                const phaseBar = document.createElement('div'); phaseBar.className = `phase-bar phase-${index}`;
+                phaseBar.style.left = `${startPercent}%`;
+                phaseBar.style.width = `${widthPercent}%`;
+                phaseBar.title = `${phase.name}: ${phase.percentage}% (${formatTime(phase.durationSeconds)}) RoR:${phase.avgRoR}`;
+                const phaseLabel = document.createElement('span'); phaseLabel.className = 'phase-label';
+                // 콤팩트 레이블 표시 (비율/시간/횟수)
+                if (widthPercent >= 2) {
+                    phaseLabel.textContent = `${phase.percentage}%/${formatTime(phase.durationSeconds)}/${phase.avgRoR}`;
+                }
+                phaseBar.appendChild(phaseLabel);
+                barContainer.appendChild(phaseBar);
+                if (index < profile.phases.length - 1) {
+                    const midMarker = document.createElement('div'); midMarker.className = 'time-marker';
+                    midMarker.style.left = `${(endSeconds / axisDurationSeconds) * 100}%`;
+                    midMarker.textContent = formatTime(endSeconds);
+                    barContainer.appendChild(midMarker);
+                }
             });
-            const endMarker = document.createElement('div'); endMarker.className = 'time-marker end-marker'; endMarker.style.left = `${(profile.totalSeconds / axisDurationSeconds) * 100}%`; endMarker.textContent = formatTime(profile.totalSeconds); barContainer.appendChild(endMarker);
-            const fileNameDiv = document.createElement('div'); fileNameDiv.className = 'profile-filename'; fileNameDiv.textContent = profile.fileName;
-            profileRow.appendChild(barContainer); profileRow.appendChild(fileNameDiv); profilesListDiv.appendChild(profileRow);
+            const endMarker = document.createElement('div'); endMarker.className = 'time-marker end-marker';
+            endMarker.style.left = `${(profile.totalSeconds / axisDurationSeconds) * 100}%`;
+            endMarker.textContent = formatTime(profile.totalSeconds);
+            barContainer.appendChild(endMarker);
+            const fileNameDiv = document.createElement('div'); fileNameDiv.className = 'profile-filename';
+            fileNameDiv.textContent = profile.fileName;
+            profileRow.appendChild(barContainer);
+            profileRow.appendChild(fileNameDiv);
+            profilesListDiv.appendChild(profileRow);
         });
 
         const timeAxis = document.createElement('div'); timeAxis.className = 'time-axis';
-        const tickIntervalSeconds = 60; const numberOfTicks = Math.floor(axisDurationSeconds / tickIntervalSeconds);
+        const tickIntervalSeconds = 60;
+        const numberOfTicks = Math.floor(axisDurationSeconds / tickIntervalSeconds);
         for (let i = 0; i <= numberOfTicks; i++) {
-            const tickSeconds = i * tickIntervalSeconds; const tickPercent = (tickSeconds / axisDurationSeconds) * 100; if (tickPercent > 100.5) continue;
-            const tickElement = document.createElement('div'); tickElement.className = 'time-tick'; tickElement.style.left = `${tickPercent}%`;
+            const tickSeconds = i * tickIntervalSeconds;
+            const tickPercent = (tickSeconds / axisDurationSeconds) * 100;
+            if (tickPercent > 100.5) continue;
+            const tickElement = document.createElement('div'); tickElement.className = 'time-tick';
+            tickElement.style.left = `${tickPercent}%`;
             const tickLine = document.createElement('div'); tickLine.className = 'time-tick-line';
-            const tickLabel = document.createElement('div'); tickLabel.className = 'time-tick-label'; tickLabel.textContent = formatTime(tickSeconds);
-            tickElement.appendChild(tickLine); tickElement.appendChild(tickLabel); timeAxis.appendChild(tickElement);
-        }
-        timeAxisContainerDiv.appendChild(timeAxis);
-    }
-
-    // --- 분석 리셋 ---
-    function resetAnalysis() { /* (이전과 동일) */ profilesData = []; profilesListDiv.innerHTML = ''; timeAxisContainerDiv.innerHTML = ''; fileCountSpan.textContent = '파일 0개'; resetButton.style.display = 'none'; profilesChartContainer.style.display = 'none'; fileInput.value = ''; }
-
-</script>
-
-</body>
-</html>
+            const tickLabel = document.createElement('div'); tickLabel.className = 'time-tick-label';
+            tickLabel
